@@ -21,16 +21,16 @@
 <script>
   // ↓↓↓ PASTE YOUR OWN FIREBASE PROJECT CONFIG HERE (see setup notes) ↓↓↓
   const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCzAzoCmDj-SAZwdzQuj9nWhWAKJBRln1g",
-  authDomain: "the-spreads.firebaseapp.com",
-  projectId: "the-spreads",
-  storageBucket: "the-spreads.firebasestorage.app",
-  messagingSenderId: "842713215097",
-  appId: "1:842713215097:web:afd5cd4cb7754d200864a8"
-};
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
   // ↑↑↑ ------------------------------------------------------------- ↑↑↑
   // Change this before you share the link — it's the commissioner PIN.
-  const ADMIN_PIN = "9353";
+  const ADMIN_PIN = "3210";
 </script>
 
 <style>
@@ -95,8 +95,9 @@
   }
   button.side .team{font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px;}
   button.side .line{font-size:12px; color:var(--muted);}
-  button.side.selected{border-color:var(--green-line); background:color-mix(in srgb, var(--green-line) 14%, var(--panel)); }
-  button.side.selected .line{color:var(--ink);}
+  button.side.selected{border-width:2px; border-color:var(--gold); background:color-mix(in srgb, var(--gold) 20%, var(--panel)); }
+  button.side.selected .line{color:var(--ink); font-weight:700;}
+  button.side.selected .team::after{content:'✓'; margin-left:auto; color:var(--gold); font-weight:800;}
   button.side:disabled{cursor:default; opacity:0.75;}
   button.star{
     width:44px; flex-shrink:0; font-family:inherit; cursor:pointer; border-radius:4px;
@@ -189,6 +190,7 @@ let profileCache = {};
 
 let state = { weeks:{}, games:{}, picks:{}, currentWeekId:null, loaded:{weeks:false, games:false, picks:false, current:false} };
 let draft = { weekId:null, selections:{}, bestBet:null };
+let draftHydrated = false;
 let view = 'play'; // 'play' | 'history' | 'admin'
 let expandedWeeks = new Set();
 let adminSelectedWeek = null;
@@ -370,8 +372,14 @@ function renderPlay(){
 
   const locked = weekIsLocked(week);
   if(draft.weekId !== weekId){
+    draft = { weekId, selections: {}, bestBet: null };
+    draftHydrated = false;
+  }
+  if(!draftHydrated && state.loaded.picks){
     const mine = state.picks[uid]?.weeks?.[weekId];
-    draft = { weekId, selections: {...(mine?.selections||{})}, bestBet: mine?.bestBet || null };
+    draft.selections = {...(mine?.selections||{})};
+    draft.bestBet = mine?.bestBet || null;
+    draftHydrated = true;
   }
   const games = gamesForWeek(weekId);
   const mySaved = state.picks[uid]?.weeks?.[weekId];
