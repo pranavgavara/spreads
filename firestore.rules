@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Anyone can read your name (needed to show it on the standings),
+    // but only you can write your own profile doc.
+    match /profiles/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Everyone can read everyone's picks (for the standings/reveal),
+    // but you can only write your own picks doc — nobody can fake
+    // someone else's picks.
+    match /picks/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Weeks, games, and the "current week" pointer: readable by anyone,
+    // writable by any signed-in visitor (Google or email-link). The app's
+    // PIN screen is what actually keeps randoms out of the commissioner
+    // tools — see the setup notes for what this does and doesn't protect
+    // against.
+    match /weeks/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /games/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /meta/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}

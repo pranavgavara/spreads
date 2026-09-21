@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Spread</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1F3D2B">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="The Spread">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Firebase (free Spark plan is plenty for a friend group) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script>
+  // ↓↓↓ PASTE YOUR OWN FIREBASE PROJECT CONFIG HERE (see setup notes) ↓↓↓
+  const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCzAzoCmDj-SAZwdzQuj9nWhWAKJBRln1g",
+  authDomain: "the-spreads.firebaseapp.com",
+  projectId: "the-spreads",
+  storageBucket: "the-spreads.firebasestorage.app",
+  messagingSenderId: "842713215097",
+  appId: "1:842713215097:web:afd5cd4cb7754d200864a8"
+};
+  // ↑↑↑ ------------------------------------------------------------- ↑↑↑
+  // Change this before you share the link — it's the commissioner PIN.
+  const ADMIN_PIN = "9353";
+</script>
+
+<style>
+  :root{
+    --bg:#F4F1E8; --panel:#FFFFFF; --panel-2:#FBFAF6; --ink:#16201A; --muted:#5C6B62;
+    --line:#DCD5C0; --gold:#9A7B14; --red:#A6362B; --green-line:#1F3D2B; --focus:#2A6BD1;
+    --chip-off:#EDEAE0; --chip-off-ink:#5C6B62;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0F1C15; --panel:#182B20; --panel-2:#152619; --ink:#EFECDF; --muted:#93A69A;
+      --line:#2C4234; --gold:#D9B23C; --red:#E2685C; --green-line:#4E7A5E; --focus:#6FA6FF;
+      --chip-off:#1F3427; --chip-off-ink:#93A69A;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0F1C15; --panel:#182B20; --panel-2:#152619; --ink:#EFECDF; --muted:#93A69A;
+    --line:#2C4234; --gold:#D9B23C; --red:#E2685C; --green-line:#4E7A5E; --focus:#6FA6FF;
+    --chip-off:#1F3427; --chip-off-ink:#93A69A;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Karla',ui-sans-serif,system-ui,-apple-system,sans-serif;
+    line-height:1.45; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px; margin:0 auto; padding:20px 16px 64px;}
+  h1,h2,h3,.num{font-family:'Big Shoulders Display',ui-sans-serif,system-ui,sans-serif; font-weight:800; letter-spacing:0.01em;}
+  a{color:inherit;}
+  .top{display:flex; align-items:baseline; justify-content:space-between; gap:12px; border-bottom:3px solid var(--ink); padding-bottom:12px; margin-bottom:18px; flex-wrap:wrap;}
+  .top h1{font-size:34px; margin:0; line-height:0.9;}
+  .top .tag{font-size:13px; color:var(--muted); margin-top:2px;}
+  .toggle{display:flex; gap:6px; align-items:center;}
+  button.pill{
+    font-family:inherit; font-size:13px; font-weight:600; color:var(--ink);
+    background:var(--panel-2); border:1px solid var(--line); border-radius:100px;
+    padding:7px 14px; cursor:pointer;
+  }
+  button.pill.active{background:var(--ink); color:var(--bg); border-color:var(--ink);}
+  button.pill:disabled{opacity:0.45; cursor:default;}
+  .week-header{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:6px; gap:10px; flex-wrap:wrap;}
+  .week-header h2{font-size:26px; margin:0;}
+  .countdown{font-size:13px; color:var(--muted); text-align:right;}
+  .countdown.urgent{color:var(--red); font-weight:700;}
+  .countdown.locked{color:var(--gold); font-weight:700;}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:4px; margin-bottom:22px;}
+  .game{padding:16px; border-bottom:1px solid var(--line);}
+  .game:last-child{border-bottom:none;}
+  .matchup{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px;}
+  .teams{font-size:15px; font-weight:600; display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;}
+  .teams .at{color:var(--muted); font-weight:400; margin:0 2px;}
+  .team-logo{width:22px; height:22px; object-fit:contain; flex-shrink:0;}
+  .team-logo.small{width:18px; height:18px;}
+  .top .tag a{color:var(--gold); text-decoration:underline;}
+  .kick{font-size:12px; color:var(--muted);}
+  .picks-row{display:flex; gap:8px; align-items:stretch;}
+  button.side{
+    flex:1; font-family:inherit; text-align:left; cursor:pointer;
+    background:var(--panel-2); border:1.5px solid var(--line); border-radius:4px;
+    padding:10px 12px; color:var(--ink);
+  }
+  button.side .team{font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px;}
+  button.side .line{font-size:12px; color:var(--muted);}
+  button.side.selected{border-color:var(--green-line); background:color-mix(in srgb, var(--green-line) 14%, var(--panel)); }
+  button.side.selected .line{color:var(--ink);}
+  button.side:disabled{cursor:default; opacity:0.75;}
+  button.star{
+    width:44px; flex-shrink:0; font-family:inherit; cursor:pointer; border-radius:4px;
+    background:var(--panel-2); border:1.5px solid var(--line); color:var(--muted); font-size:18px;
+  }
+  button.star.selected{background:var(--gold); border-color:var(--gold); color:var(--ink);}
+  button.star:disabled{cursor:default;}
+  .reveal{margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); font-size:13px; color:var(--muted);}
+  .reveal .rowline{display:flex; justify-content:space-between; padding:2px 0;}
+  .reveal .hit{color:var(--green-line); font-weight:700;}
+  .reveal .miss{color:var(--red);}
+  .result-tag{font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--gold); font-weight:700; margin-left:8px;}
+  .submitbar{display:flex; justify-content:space-between; align-items:center; padding:14px 16px; gap:10px; flex-wrap:wrap;}
+  .submitbar .status{font-size:13px; color:var(--muted);}
+  button.primary{
+    font-family:inherit; font-weight:700; font-size:14px; cursor:pointer;
+    background:var(--green-line); color:#fff; border:none; border-radius:4px; padding:11px 20px;
+  }
+  button.primary:disabled{opacity:0.4; cursor:default;}
+  button.ghost{font-family:inherit; font-size:13px; cursor:pointer; background:none; border:1px solid var(--line); color:var(--ink); border-radius:4px; padding:8px 12px;}
+  button.danger{color:var(--red); border-color:var(--red);}
+  h3.section{font-size:20px; margin:0 0 10px;}
+  table.board{width:100%; border-collapse:collapse; font-size:14px;}
+  table.board th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); font-weight:600; padding:8px 10px; border-bottom:2px solid var(--ink);}
+  table.board td{padding:9px 10px; border-bottom:1px solid var(--line);}
+  table.board tr:last-child td{border-bottom:none;}
+  table.board td.rank{font-family:'Big Shoulders Display'; font-weight:800; font-size:17px; color:var(--muted);}
+  table.board td.name{font-weight:700;}
+  table.board td.pts{font-family:'Big Shoulders Display'; font-weight:800; font-size:19px; text-align:right;}
+  .you-tag{font-size:10px; text-transform:uppercase; color:var(--gold); font-weight:700; margin-left:6px;}
+  .pips{display:flex; flex-wrap:wrap; gap:8px; padding:14px 16px;}
+  .pip{font-size:12px; padding:4px 10px; border-radius:100px; background:var(--chip-off); color:var(--chip-off-ink); border:1px solid var(--line);}
+  .pip.done{background:var(--green-line); color:#fff; border-color:var(--green-line);}
+  .empty{padding:24px 16px; color:var(--muted); font-size:14px;}
+  .admin-block{padding:16px; border-bottom:1px solid var(--line);}
+  .admin-block:last-child{border-bottom:none;}
+  .field-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;}
+  .field-row input, .field-row select{
+    font-family:inherit; font-size:13px; padding:8px 10px; border:1px solid var(--line);
+    border-radius:4px; background:var(--panel-2); color:var(--ink);
+  }
+  .field-row input[type=text]{flex:1; min-width:110px;}
+  label.lbl{font-size:11px; color:var(--muted); display:block; margin-bottom:3px;}
+  .admin-week-row{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); gap:8px; flex-wrap:wrap;}
+  .admin-week-row:last-child{border-bottom:none;}
+  .admin-game-row{padding:10px 0; border-bottom:1px solid var(--line);}
+  .admin-game-row:last-child{border-bottom:none;}
+  .admin-game-row .top-line{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;}
+  .muted{color:var(--muted);}
+  .banner{background:var(--panel-2); border:1px solid var(--line); border-radius:4px; padding:14px 16px; font-size:13px; color:var(--muted); margin-bottom:18px;}
+  .banner.urgent{border-color:var(--red); color:var(--ink);}
+  .banner.urgent strong{color:var(--red);}
+  .streak-badge{font-size:11px; color:var(--gold); margin-left:6px; white-space:nowrap;}
+  .history-week{border-bottom:1px solid var(--line);}
+  .history-week:last-child{border-bottom:none;}
+  .history-week-head{display:flex; justify-content:space-between; align-items:center; padding:14px 16px; cursor:pointer;}
+  .history-week-head:hover{background:var(--panel-2);}
+  .history-week-head .chev{color:var(--muted); font-size:13px;}
+  .history-body .game{padding:12px 16px;}
+  footer{text-align:center; font-size:12px; color:var(--muted); margin-top:28px;}
+  @media (max-width:480px){
+    .top h1{font-size:28px;}
+    .picks-row{flex-wrap:wrap;}
+    button.star{width:100%;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="top">
+    <div>
+      <h1>THE SPREAD</h1>
+      <div class="tag">Weekly picks against the line. Best bet pays double. <a href="#" id="rulesLink">Rules</a></div>
+    </div>
+    <div class="toggle" id="viewToggle"></div>
+  </div>
+  <div id="content"><div class="empty">Loading…</div></div>
+  <footer>Picks lock when a week is marked locked, or automatically at the deadline shown above.</footer>
+</div>
+
+<script>
+const $ = (sel, el=document) => el.querySelector(sel);
+const esc = (s) => (s==null? '' : String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtSpread = (n) => n===0 ? 'PICK' : (n>0? '+'+n : String(n));
+const teamLabel = (name, logo, small) => `${logo ? `<img class="team-logo${small?' small':''}" src="${esc(logo)}" alt="" loading="lazy">` : ''}<span>${esc(name)}</span>`;
+
+let db=null;
+let uid=null, myName=null, canEdit=false;
+let profileCache = {};
+
+let state = { weeks:{}, games:{}, picks:{}, currentWeekId:null, loaded:{weeks:false, games:false, picks:false, current:false} };
+let draft = { weekId:null, selections:{}, bestBet:null };
+let view = 'play'; // 'play' | 'history' | 'admin'
+let expandedWeeks = new Set();
+let adminSelectedWeek = null;
+let saving = false;
+let saveMsg = '';
+
+function render(){
+  renderToggle();
+  if(view==='admin' && canEdit){
+    $('#content').innerHTML = renderAdmin();
+    wireAdmin();
+  } else if(view==='history'){
+    $('#content').innerHTML = renderHistory();
+    wireHistory();
+  } else {
+    $('#content').innerHTML = renderPlay();
+    wirePlay();
+  }
+}
+
+function renderToggle(){
+  const t = $('#viewToggle');
+  let html = `
+    <button class="pill ${view==='play'?'active':''}" data-view="play">Play</button>
+    <button class="pill ${view==='history'?'active':''}" data-view="history">History</button>
+  `;
+  if(canEdit){
+    html += `<button class="pill ${view==='admin'?'active':''}" data-view="admin">Admin</button>`;
+  } else {
+    html += `<button class="pill" id="unlockAdmin">Commissioner</button>`;
+  }
+  t.innerHTML = html;
+  t.querySelectorAll('button[data-view]').forEach(b=> b.onclick = ()=>{ view=b.dataset.view; render(); });
+  const unlockBtn = $('#unlockAdmin', t);
+  if(unlockBtn) unlockBtn.onclick = () => {
+    const pin = prompt('Commissioner PIN:');
+    if(pin===null) return;
+    if(pin===ADMIN_PIN){
+      canEdit = true; localStorage.setItem('spread_is_admin','yes'); view='admin'; render();
+    } else {
+      alert('Wrong PIN.');
+    }
+  };
+}
+
+// ---------- derived helpers ----------
+function weekIsLocked(week){
+  if(!week) return false;
+  if(week.locked) return true;
+  if(week.deadline && Date.now() >= new Date(week.deadline).getTime()) return true;
+  return false;
+}
+function gameIsLocked(g){
+  return !!(g.kickoff && Date.now() >= new Date(g.kickoff).getTime());
+}
+function gamesForWeek(weekId){
+  return Object.entries(state.games)
+    .filter(([id,g]) => g.weekId===weekId)
+    .sort((a,b)=> (a[1].order??0)-(b[1].order??0))
+    .map(([id,g]) => ({id, ...g}));
+}
+function scoreForUser(uidKey){
+  const doc = state.picks[uidKey];
+  let pts=0, correct=0, total=0, bestHits=0;
+  if(!doc || !doc.weeks) return {pts,correct,total,bestHits};
+  Object.entries(doc.weeks).forEach(([weekId, wk]) => {
+    const games = gamesForWeek(weekId);
+    games.forEach(g => {
+      if(!g.final || !g.atsResult || g.atsResult==='push') return;
+      const pick = wk.selections && wk.selections[g.id];
+      if(!pick) return;
+      total++;
+      const isBest = wk.bestBet === g.id;
+      if(pick === g.atsResult){
+        correct++;
+        pts += isBest ? 2 : 1;
+        if(isBest) bestHits++;
+      }
+    });
+  });
+  return {pts, correct, total, bestHits};
+}
+// Consecutive most-recent weeks (walking backward) where the user's best
+// bet hit. Weeks with no best bet, or whose best-bet game isn't graded
+// yet, are skipped rather than breaking the streak; a graded miss ends it.
+function bestBetStreak(uidKey){
+  const doc = state.picks[uidKey];
+  if(!doc || !doc.weeks) return 0;
+  const orderedWeekIds = Object.keys(state.weeks)
+    .sort((a,b)=> new Date(state.weeks[a].createdAt||0) - new Date(state.weeks[b].createdAt||0));
+  let streak = 0;
+  for(let i=orderedWeekIds.length-1; i>=0; i--){
+    const wid = orderedWeekIds[i];
+    const wk = doc.weeks[wid];
+    if(!wk || !wk.bestBet) continue;
+    const games = gamesForWeek(wid);
+    const bestGame = games.find(g => g.id===wk.bestBet);
+    if(!bestGame || !bestGame.final || !bestGame.atsResult || bestGame.atsResult==='push') continue;
+    const pick = wk.selections && wk.selections[wk.bestBet];
+    if(pick === bestGame.atsResult){ streak++; }
+    else { break; }
+  }
+  return streak;
+}
+function ensureProfiles(ids){ /* no-op: profiles collection is subscribed live in boot() */ }
+function nameFor(id){
+  if(id===uid) return (profileCache[id]?.name || myName || 'You');
+  return profileCache[id]?.name || 'Someone';
+}
+function showRulesModal(){
+  const overlay = document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(10,14,11,0.6);display:flex;align-items:center;justify-content:center;z-index:999;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:24px;max-width:400px;width:100%;font-family:'Karla',sans-serif;max-height:85vh;overflow-y:auto;">
+      <h2 style="margin:0 0 12px;font-family:'Big Shoulders Display',sans-serif;font-size:26px;color:var(--ink);">How this works</h2>
+      <div style="font-size:14px;color:var(--ink);line-height:1.6;">
+        <p style="margin:0 0 10px;"><strong>Pick a side.</strong> For each game, pick the team you think covers the spread — the favorite has to win by more than the number, the underdog just has to not lose by more than it. Landing exactly on the number is a push and scores 0 either way, for everyone.</p>
+        <p style="margin:0 0 10px;"><strong>One best bet.</strong> Tap the ★ on exactly one game each week. It's worth double if it hits — same as a normal pick if it doesn't.</p>
+        <p style="margin:0 0 6px;"><strong>Scoring</strong></p>
+        <ul style="margin:0 0 10px; padding-left:20px;">
+          <li>Correct pick — 1 point</li>
+          <li>Correct best bet — 2 points</li>
+          <li>Wrong pick, or a push — 0 points</li>
+        </ul>
+        <p style="margin:0 0 10px;"><strong>Locks.</strong> Each game locks the moment it kicks off. Games later in the week stay pickable even after earlier ones have started.</p>
+        <p style="margin:0;"><strong>Ties</strong> in the season standings are broken by best-bet hits, then overall pick accuracy.</p>
+      </div>
+      <button id="closeRules" class="primary" style="width:100%;margin-top:16px;">Got it</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#closeRules').onclick = () => overlay.remove();
+  overlay.addEventListener('click', (e) => { if(e.target===overlay) overlay.remove(); });
+}
+function showNameModal(onSubmit){
+  const overlay = document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(10,14,11,0.6);display:flex;align-items:center;justify-content:center;z-index:999;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:24px;max-width:340px;width:100%;font-family:'Karla',sans-serif;">
+      <h2 style="margin:0 0 6px;font-family:'Big Shoulders Display',sans-serif;font-size:26px;color:var(--ink);">Who's picking?</h2>
+      <p style="margin:0 0 14px;font-size:13px;color:var(--muted);">This is the name your friends will see on the standings.</p>
+      <input id="nameInput" type="text" placeholder="Your name" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:4px;background:var(--panel-2);color:var(--ink);font-family:inherit;font-size:14px;margin-bottom:12px;">
+      <button id="nameSubmit" class="primary" style="width:100%;">Let's go</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  const input = overlay.querySelector('#nameInput');
+  const submit = () => {
+    const val = input.value.trim();
+    if(!val) return;
+    overlay.remove();
+    onSubmit(val);
+  };
+  overlay.querySelector('#nameSubmit').onclick = submit;
+  input.addEventListener('keydown', e => { if(e.key==='Enter') submit(); });
+  input.focus();
+}
+async function ensureName(){
+  const snap = await db.collection('profiles').doc(uid).get();
+  if(snap.exists && snap.data().name){ myName = snap.data().name; return; }
+  await new Promise(resolve => {
+    showNameModal(async (name) => {
+      await db.collection('profiles').doc(uid).set({name});
+      myName = name;
+      resolve();
+    });
+  });
+}
+
+// ---------- PLAY VIEW ----------
+function renderPlay(){
+  const weekId = state.currentWeekId;
+  const week = weekId ? state.weeks[weekId] : null;
+  let html = '';
+
+  if(!week){
+    html += `<div class="empty">No week is live yet. Check back once the commissioner sets one up.</div>`;
+    html += renderLeaderboard();
+    return html;
+  }
+
+  const locked = weekIsLocked(week);
+  if(draft.weekId !== weekId){
+    const mine = state.picks[uid]?.weeks?.[weekId];
+    draft = { weekId, selections: {...(mine?.selections||{})}, bestBet: mine?.bestBet || null };
+  }
+  const games = gamesForWeek(weekId);
+  const mySaved = state.picks[uid]?.weeks?.[weekId];
+
+  let countdownHtml = '';
+  if(week.deadline){
+    const ms = new Date(week.deadline).getTime() - Date.now();
+    if(locked){
+      countdownHtml = `<div class="countdown locked">Picks locked</div>`;
+    } else {
+      const hrs = ms/3600000;
+      const cls = hrs < 3 ? 'urgent' : '';
+      countdownHtml = `<div class="countdown ${cls}">Locks ${new Date(week.deadline).toLocaleString([], {weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})}</div>`;
+    }
+  } else if(locked){
+    countdownHtml = `<div class="countdown locked">Picks locked</div>`;
+  }
+
+  html += `<div class="week-header"><h2>${esc(week.label||'This week')}</h2>${countdownHtml}</div>`;
+
+  if(!locked){
+    const unpicked = games.filter(g => !gameIsLocked(g) && !draft.selections[g.id] && g.kickoff);
+    let soonestMs = null;
+    unpicked.forEach(g => {
+      const ms = new Date(g.kickoff).getTime() - Date.now();
+      if(soonestMs===null || ms < soonestMs) soonestMs = ms;
+    });
+    if(unpicked.length>0 && soonestMs!==null && soonestMs < 6*3600000){
+      const hrs = soonestMs/3600000;
+      const timeTxt = hrs < 1 ? Math.max(1, Math.round(soonestMs/60000))+' min' : Math.round(hrs)+' hr'+(Math.round(hrs)===1?'':'s');
+      html += `<div class="banner urgent"><strong>${unpicked.length} game${unpicked.length===1?'':'s'} not picked yet</strong> — locks in about ${timeTxt}.</div>`;
+    }
+  }
+
+  if(games.length===0){
+    html += `<div class="panel"><div class="empty">No games added for this week yet.</div></div>`;
+  } else {
+    html += `<div class="panel">`;
+    ensureProfiles(Object.keys(state.picks));
+    let anyOpen = false;
+    games.forEach(g => {
+      const gLocked = locked || gameIsLocked(g);
+      if(!gLocked) anyOpen = true;
+      const favFav = g.favorite==='home' ? g.home : (g.favorite==='away' ? g.away : null);
+      const awayLine = g.favorite==='away' ? fmtSpread(-Math.abs(g.spread)) : (g.favorite==='home' ? fmtSpread(Math.abs(g.spread)) : 'PICK');
+      const homeLine = g.favorite==='home' ? fmtSpread(-Math.abs(g.spread)) : (g.favorite==='away' ? fmtSpread(Math.abs(g.spread)) : 'PICK');
+      const mySel = draft.selections[g.id];
+      const isBest = draft.bestBet === g.id;
+      const resultTag = g.final && g.atsResult ? `<span class="result-tag">${g.atsResult==='push'?'PUSH':(g.atsResult==='home'?esc(g.home)+' covered':esc(g.away)+' covered')}</span>` : '';
+      const kickLabel = g.kickoff ? new Date(g.kickoff).toLocaleString([], {weekday:'short', hour:'numeric', minute:'2-digit'}) : '';
+
+      html += `<div class="game" data-game="${g.id}">
+        <div class="matchup">
+          <div class="teams">${teamLabel(g.away, g.awayLogo, true)}<span class="at">@</span>${teamLabel(g.home, g.homeLogo, true)}${resultTag}</div>
+          ${kickLabel ? `<div class="kick">${gLocked && !locked ? 'Locked · ':''}${esc(kickLabel)}</div>` : (gLocked ? `<div class="kick">Locked</div>` : '')}
+        </div>
+        <div class="picks-row">
+          <button class="side ${mySel==='away'?'selected':''}" data-side="away" ${gLocked?'disabled':''}>
+            <span class="team">${teamLabel(g.away, g.awayLogo)}</span><span class="line">${awayLine}</span>
+          </button>
+          <button class="side ${mySel==='home'?'selected':''}" data-side="home" ${gLocked?'disabled':''}>
+            <span class="team">${teamLabel(g.home, g.homeLogo)}</span><span class="line">${homeLine}</span>
+          </button>
+          <button class="star ${isBest?'selected':''}" data-star="1" title="Best bet — double points" ${gLocked?'disabled':''}>★</button>
+        </div>
+        ${gLocked ? renderReveal(g) : ''}
+      </div>`;
+    });
+    html += `</div>`;
+
+    if(anyOpen){
+      const savedTxt = mySaved ? 'Saved. Edit any open game until it kicks off.' : 'Not submitted yet.';
+      html += `<div class="panel"><div class="submitbar">
+        <div class="status">${saveMsg || savedTxt}</div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          ${mySaved ? `<button class="ghost danger" id="clearMyPicks">Clear my picks</button>` : ''}
+          <button class="primary" id="submitPicks" ${saving?'disabled':''}>${saving?'Saving…':'Save picks'}</button>
+        </div>
+      </div></div>`;
+    } else {
+      html += renderSubmittedPips(weekId);
+    }
+  }
+
+  html += renderLeaderboard();
+  return html;
+}
+
+function renderReveal(g){
+  const rows = Object.entries(state.picks)
+    .filter(([pid, doc]) => doc.weeks && doc.weeks[g.weekId] && doc.weeks[g.weekId].selections && doc.weeks[g.weekId].selections[g.id])
+    .map(([pid, doc]) => {
+      const wk = doc.weeks[g.weekId];
+      const pick = wk.selections[g.id];
+      const isBest = wk.bestBet === g.id;
+      const team = pick==='home' ? g.home : g.away;
+      let cls = '';
+      if(g.final && g.atsResult && g.atsResult!=='push'){
+        cls = pick===g.atsResult ? 'hit' : 'miss';
+      }
+      return {pid, label: `${team}${isBest? ' ★':''}`, cls};
+    });
+  if(rows.length===0) return `<div class="reveal">No picks submitted.</div>`;
+  ensureProfiles(rows.map(r=>r.pid));
+  return `<div class="reveal">${rows.map(r=> `<div class="rowline"><span>${esc(nameFor(r.pid))}</span><span class="${r.cls}">${esc(r.label)}</span></div>`).join('')}</div>`;
+}
+
+function renderSubmittedPips(weekId){
+  const ids = Object.keys(state.picks);
+  if(ids.length===0) return '';
+  ensureProfiles(ids);
+  return `<div class="panel"><div class="pips">${ids.map(id => {
+    const done = !!(state.picks[id].weeks && state.picks[id].weeks[weekId]);
+    return `<span class="pip ${done?'done':''}">${esc(nameFor(id))}</span>`;
+  }).join('')}</div></div>`;
+}
+
+function renderLeaderboard(){
+  const ids = Object.keys(state.picks);
+  ensureProfiles(ids);
+  const rows = ids.map(id => ({id, ...scoreForUser(id), streak: bestBetStreak(id)}))
+    .sort((a,b) =>
+      b.pts - a.pts ||
+      b.bestHits - a.bestHits ||
+      (b.total? b.correct/b.total : 0) - (a.total? a.correct/a.total : 0) ||
+      nameFor(a.id).localeCompare(nameFor(b.id))
+    );
+  let html = `<h3 class="section">Standings</h3><div class="panel">`;
+  if(rows.length===0){
+    html += `<div class="empty">No picks submitted yet — standings will appear once someone plays.</div>`;
+  } else {
+    html += `<table class="board"><thead><tr><th></th><th>Player</th><th style="text-align:right">Record</th><th style="text-align:right">Pts</th></tr></thead><tbody>`;
+    rows.forEach((r,i) => {
+      html += `<tr>
+        <td class="rank">${i+1}</td>
+        <td class="name">${esc(nameFor(r.id))}${r.id===uid?'<span class="you-tag">You</span>':''}${r.streak>=2?`<span class="streak-badge">🔥${r.streak}</span>`:''}</td>
+        <td style="text-align:right" class="muted">${r.correct}-${r.total-r.correct}${r.bestHits? ' · '+r.bestHits+'★':''}</td>
+        <td class="pts">${r.pts}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function wirePlay(){
+  const weekId = state.currentWeekId;
+  const week = weekId ? state.weeks[weekId] : null;
+  if(!week || weekIsLocked(week)) return;
+  $('#content').querySelectorAll('.game').forEach(gameEl => {
+    const gid = gameEl.dataset.game;
+    gameEl.querySelectorAll('button.side').forEach(btn => {
+      btn.onclick = () => {
+        draft.selections[gid] = btn.dataset.side;
+        if(uid) render();
+      };
+    });
+    const star = gameEl.querySelector('button.star');
+    if(star) star.onclick = () => {
+      draft.bestBet = (draft.bestBet===gid) ? null : gid;
+      render();
+    };
+  });
+  const submitBtn = $('#submitPicks');
+  if(submitBtn) submitBtn.onclick = savePicks;
+  const clearBtn = $('#clearMyPicks');
+  if(clearBtn) clearBtn.onclick = clearMyPicks;
+}
+
+async function savePicks(){
+  if(!uid || saving) return;
+  saving = true; saveMsg=''; render();
+  try{
+    const existing = state.picks[uid] || {};
+    const weeks = {...(existing.weeks||{})};
+    weeks[draft.weekId] = { selections: {...draft.selections}, bestBet: draft.bestBet, updatedAt: new Date().toISOString() };
+    await db.collection('picks').doc(uid).set({ ...existing, weeks });
+    saveMsg = 'Saved ✓';
+  } catch(e){
+    saveMsg = 'Could not save — try again.';
+  }
+  saving = false; render();
+  setTimeout(()=>{ saveMsg=''; render(); }, 3000);
+}
+
+async function clearMyPicks(){
+  if(!uid || saving) return;
+  if(!confirm('Clear your picks for this week? This only affects you.')) return;
+  saving = true; render();
+  try{
+    const existing = state.picks[uid] || {};
+    const weeks = {...(existing.weeks||{})};
+    delete weeks[draft.weekId];
+    await db.collection('picks').doc(uid).set({ ...existing, weeks });
+    draft = { weekId: draft.weekId, selections: {}, bestBet: null };
+    saveMsg = 'Cleared.';
+  } catch(e){
+    saveMsg = 'Could not clear — try again.';
+  }
+  saving = false; render();
+  setTimeout(()=>{ saveMsg=''; render(); }, 3000);
+}
+
+// ---------- HISTORY VIEW ----------
+function renderHistory(){
+  const pastWeekIds = Object.keys(state.weeks)
+    .filter(id => id !== state.currentWeekId)
+    .sort((a,b) => new Date(state.weeks[b].createdAt||0) - new Date(state.weeks[a].createdAt||0));
+
+  let html = `<h3 class="section">Season history</h3>`;
+  if(pastWeekIds.length===0){
+    html += `<div class="panel"><div class="empty">No past weeks yet — this is where finished weeks will show up for browsing (and roasting).</div></div>`;
+    return html;
+  }
+  html += `<div class="panel">`;
+  pastWeekIds.forEach(wid => {
+    const w = state.weeks[wid];
+    const games = gamesForWeek(wid);
+    const gradedCount = games.filter(g=>g.final && g.atsResult).length;
+    const isOpen = expandedWeeks.has(wid);
+    html += `<div class="history-week">
+      <div class="history-week-head" data-toggle="${wid}">
+        <div><strong>${esc(w.label||wid)}</strong> <span class="muted">${games.length} game${games.length===1?'':'s'}${gradedCount? ' · '+gradedCount+' graded':''}</span></div>
+        <span class="chev">${isOpen?'▲':'▼'}</span>
+      </div>`;
+    if(isOpen){
+      html += `<div class="history-body">`;
+      if(games.length===0){
+        html += `<div class="empty">No games were added for this week.</div>`;
+      } else {
+        games.forEach(g => {
+          const resultTag = g.final && g.atsResult ? `<span class="result-tag">${g.atsResult==='push'?'PUSH':(g.atsResult==='home'?esc(g.home)+' covered':esc(g.away)+' covered')}</span>` : '<span class="result-tag" style="color:var(--muted)">UNGRADED</span>';
+          html += `<div class="game">
+            <div class="matchup"><div class="teams">${teamLabel(g.away, g.awayLogo, true)}<span class="at">@</span>${teamLabel(g.home, g.homeLogo, true)}${resultTag}</div></div>
+            ${renderReveal(g)}
+          </div>`;
+        });
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+function wireHistory(){
+  $('#content').querySelectorAll('[data-toggle]').forEach(el => {
+    el.onclick = () => {
+      const wid = el.dataset.toggle;
+      if(expandedWeeks.has(wid)) expandedWeeks.delete(wid); else expandedWeeks.add(wid);
+      render();
+    };
+  });
+}
+
+// ---------- ADMIN VIEW ----------
+function renderAdmin(){
+  const weekIds = Object.keys(state.weeks).sort((a,b)=> new Date(state.weeks[a].createdAt||0) - new Date(state.weeks[b].createdAt||0));
+  if(!adminSelectedWeek || !state.weeks[adminSelectedWeek]) adminSelectedWeek = state.currentWeekId || weekIds[weekIds.length-1] || null;
+
+  let html = `<h3 class="section">Weeks</h3><div class="panel">`;
+  if(weekIds.length===0){
+    html += `<div class="admin-block muted">No weeks yet — add one below.</div>`;
+  } else {
+    weekIds.forEach(id => {
+      const w = state.weeks[id];
+      const isCurrent = state.currentWeekId===id;
+      html += `<div class="admin-block admin-week-row">
+        <div><strong>${esc(w.label||id)}</strong> <span class="muted">${w.deadline? new Date(w.deadline).toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}) : 'no deadline'}</span> ${isCurrent?'<span class="you-tag">Live</span>':''}${w.locked?' <span class="you-tag">Locked</span>':''}</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="ghost" data-setcurrent="${id}" ${isCurrent?'disabled':''}>Set live</button>
+          <button class="ghost" data-togglelock="${id}">${w.locked?'Unlock':'Lock'}</button>
+          <button class="ghost" data-managegames="${id}">Games</button>
+          <button class="ghost danger" data-deleteweek="${id}">Delete</button>
+        </div>
+      </div>`;
+    });
+  }
+  html += `<div class="admin-block">
+    <div class="field-row">
+      <div><label class="lbl">Week label</label><input type="text" id="newWeekLabel" placeholder="Week 3"></div>
+      <div><label class="lbl">Pick deadline</label><input type="datetime-local" id="newWeekDeadline"></div>
+      <div style="align-self:flex-end;"><button class="primary" id="addWeekBtn">Add week</button></div>
+    </div>
+  </div></div>`;
+
+  html += `<h3 class="section">Games ${adminSelectedWeek? '— '+esc(state.weeks[adminSelectedWeek]?.label||'') : ''}</h3><div class="panel">`;
+  if(!adminSelectedWeek){
+    html += `<div class="admin-block muted">Add a week above, then add games for it here.</div>`;
+  } else {
+    const games = gamesForWeek(adminSelectedWeek);
+    if(games.length===0){
+      html += `<div class="admin-block muted">No games yet for this week.</div>`;
+    }
+    games.forEach(g => {
+      html += `<div class="admin-block admin-game-row" data-gid="${g.id}">
+        <div class="top-line">
+          <strong>${esc(g.away)} @ ${esc(g.home)}</strong>
+          <button class="ghost danger" data-deletegame="${g.id}">Delete</button>
+        </div>
+        <div class="muted" style="font-size:12px; margin-bottom:6px;">Favorite: ${g.favorite? esc(g.favorite==='home'?g.home:g.away) : 'even'} ${g.spread? '-'+g.spread : ''}${g.kickoff? ' · locks '+esc(new Date(g.kickoff).toLocaleString([], {weekday:'short', hour:'numeric', minute:'2-digit'})):' · no auto-lock (falls back to week deadline)'}</div>
+        <div class="field-row">
+          <select data-result="${g.id}">
+            <option value="" ${!g.atsResult?'selected':''}>Result: pending</option>
+            <option value="home" ${g.atsResult==='home'?'selected':''}>${esc(g.home)} covered</option>
+            <option value="away" ${g.atsResult==='away'?'selected':''}>${esc(g.away)} covered</option>
+            <option value="push" ${g.atsResult==='push'?'selected':''}>Push</option>
+          </select>
+        </div>
+      </div>`;
+    });
+    html += `<div class="admin-block">
+      <div class="field-row">
+        <div><label class="lbl">Away team</label><input type="text" id="gAway"></div>
+        <div><label class="lbl">Home team</label><input type="text" id="gHome"></div>
+      </div>
+      <div class="field-row">
+        <div><label class="lbl">Favorite</label><select id="gFav"><option value="">Even</option><option value="home">Home</option><option value="away">Away</option></select></div>
+        <div><label class="lbl">Spread</label><input type="text" inputmode="decimal" id="gSpread" placeholder="3.5" style="width:80px;"></div>
+        <div><label class="lbl">Kickoff (locks pick at this time)</label><input type="datetime-local" id="gKick"></div>
+        <div style="align-self:flex-end;"><button class="primary" id="addGameBtn">Add game</button></div>
+      </div>
+    </div>`;
+  }
+  html += `</div>`;
+
+  html += `<h3 class="section">Danger zone</h3><div class="panel">
+    <div class="admin-block">
+      <div class="muted" style="font-size:13px; margin-bottom:10px;">Everyone's picks stay private to them until you use these — there's no undo once you do.</div>
+      <div class="field-row">
+        <button class="ghost danger" id="clearAllPicksBtn">Clear everyone's picks</button>
+        <button class="ghost danger" id="resetEverythingBtn">Reset everything (weeks, games &amp; picks)</button>
+      </div>
+    </div>
+  </div>`;
+
+  return html;
+}
+
+function wireAdmin(){
+  $('#content').querySelectorAll('[data-setcurrent]').forEach(b => b.onclick = () => db.doc('meta/current').set({weekId:b.dataset.setcurrent}));
+  $('#content').querySelectorAll('[data-togglelock]').forEach(b => b.onclick = () => {
+    const id = b.dataset.togglelock;
+    db.doc('weeks/'+id).update({locked: !state.weeks[id].locked});
+  });
+  $('#content').querySelectorAll('[data-managegames]').forEach(b => b.onclick = () => { adminSelectedWeek = b.dataset.managegames; render(); });
+  $('#content').querySelectorAll('[data-deleteweek]').forEach(b => b.onclick = () => {
+    if(!confirm('Delete this week and its games?')) return;
+    const id = b.dataset.deleteweek;
+    gamesForWeek(id).forEach(g => db.doc('games/'+g.id).delete());
+    db.doc('weeks/'+id).delete();
+    if(adminSelectedWeek===id) adminSelectedWeek=null;
+  });
+  $('#content').querySelectorAll('[data-deletegame]').forEach(b => b.onclick = () => db.doc('games/'+b.dataset.deletegame).delete());
+  $('#content').querySelectorAll('[data-result]').forEach(sel => sel.onchange = () => {
+    const gid = sel.dataset.result;
+    const val = sel.value;
+    if(val===''){ db.doc('games/'+gid).update({atsResult:null, final:false}); }
+    else { db.doc('games/'+gid).update({atsResult:val, final:true}); }
+  });
+  const addWeekBtn = $('#addWeekBtn');
+  if(addWeekBtn) addWeekBtn.onclick = async () => {
+    const label = $('#newWeekLabel').value.trim() || 'Untitled week';
+    const dlRaw = $('#newWeekDeadline').value;
+    const deadline = dlRaw ? new Date(dlRaw).toISOString() : null;
+    const ref = await db.collection('weeks').add({label, deadline, locked:false, createdAt:new Date().toISOString()});
+    adminSelectedWeek = ref.id;
+    if(!state.currentWeekId) db.doc('meta/current').set({weekId: ref.id});
+  };
+  const addGameBtn = $('#addGameBtn');
+  if(addGameBtn) addGameBtn.onclick = async () => {
+    const away = $('#gAway').value.trim(), home = $('#gHome').value.trim();
+    if(!away || !home) return;
+    const fav = $('#gFav').value || null;
+    const spread = Math.abs(parseFloat($('#gSpread').value)) || 0;
+    const kickRaw = $('#gKick').value;
+    const kickoff = kickRaw ? new Date(kickRaw).toISOString() : null;
+    const order = gamesForWeek(adminSelectedWeek).length;
+    await db.collection('games').add({weekId: adminSelectedWeek, order, away, home, favorite:fav, spread, kickoff, atsResult:null, final:false});
+    $('#gAway').value=''; $('#gHome').value=''; $('#gSpread').value=''; $('#gKick').value='';
+  };
+
+  const clearAllPicksBtn = $('#clearAllPicksBtn');
+  if(clearAllPicksBtn) clearAllPicksBtn.onclick = async () => {
+    if(!confirm(`Delete every player's picks across every week? Weeks and games stay put. This cannot be undone.`)) return;
+    const snap = await db.collection('picks').get();
+    await Promise.all(snap.docs.map(d => d.ref.delete()));
+    alert('All picks cleared.');
+  };
+  const resetEverythingBtn = $('#resetEverythingBtn');
+  if(resetEverythingBtn) resetEverythingBtn.onclick = async () => {
+    if(!confirm('This deletes ALL weeks, games, and picks — a full reset back to nothing. Are you sure?')) return;
+    if(!confirm('Really sure? There is no undo.')) return;
+    const [weeksSnap, gamesSnap, picksSnap] = await Promise.all([
+      db.collection('weeks').get(),
+      db.collection('games').get(),
+      db.collection('picks').get(),
+    ]);
+    await Promise.all([
+      ...weeksSnap.docs.map(d => d.ref.delete()),
+      ...gamesSnap.docs.map(d => d.ref.delete()),
+      ...picksSnap.docs.map(d => d.ref.delete()),
+      db.doc('meta/current').delete(),
+    ]);
+    adminSelectedWeek = null;
+    alert('Everything reset.');
+  };
+}
+
+// ---------- sign-in screen ----------
+function renderSignInScreen(){
+  $('#content').innerHTML = `
+    <div class="panel">
+      <div style="padding:28px 20px; text-align:center;">
+        <h2 style="font-size:26px; margin:0 0 8px;">Sign in to play</h2>
+        <div class="muted" style="font-size:13px; margin-bottom:20px;">One sign-in works on every device — phone, laptop, whatever.</div>
+        <button class="primary" id="googleSignIn" style="width:100%; max-width:280px; margin-bottom:14px;">Continue with Google</button>
+        <div class="muted" style="font-size:12px; margin-bottom:10px;">— or —</div>
+        <div style="max-width:280px; margin:0 auto;">
+          <input type="email" id="emailInput" placeholder="you@email.com" style="width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:4px; background:var(--panel-2); color:var(--ink); font-family:inherit; font-size:14px; margin-bottom:10px;">
+          <button class="ghost" id="emailSignIn" style="width:100%;">Email me a sign-in link</button>
+          <div class="muted" id="emailStatus" style="font-size:12px; margin-top:8px;"></div>
+        </div>
+      </div>
+    </div>`;
+  $('#googleSignIn').onclick = async () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    try{ await firebase.auth().signInWithRedirect(provider); }
+    catch(e){ alert('Could not start Google sign-in: ' + e.message); }
+  };
+  $('#emailSignIn').onclick = async () => {
+    const email = $('#emailInput').value.trim();
+    if(!email){ $('#emailStatus').textContent = 'Enter your email first.'; return; }
+    const actionCodeSettings = { url: window.location.href, handleCodeInApp: true };
+    try{
+      await firebase.auth().sendSignInLinkToEmail(email, actionCodeSettings);
+      localStorage.setItem('spread_pending_email', email);
+      $('#emailStatus').textContent = `Sent! Check ${email} and open the link on this device (or any device — it'll ask you to confirm your email).`;
+    } catch(e){
+      $('#emailStatus').textContent = 'Could not send that: ' + e.message;
+    }
+  };
+}
+
+let appStarted = false;
+let unsubscribers = [];
+let renderIntervalId = null;
+
+function stopApp(){
+  unsubscribers.forEach(u => u());
+  unsubscribers = [];
+  if(renderIntervalId){ clearInterval(renderIntervalId); renderIntervalId = null; }
+  appStarted = false;
+}
+
+function startApp(){
+  if(appStarted) return;
+  appStarted = true;
+
+  unsubscribers.push(db.collection('profiles').onSnapshot(qs => {
+    const m = {}; qs.docs.forEach(d => m[d.id]=d.data());
+    profileCache = m; render();
+  }));
+
+  unsubscribers.push(db.doc('meta/current').onSnapshot(snap => {
+    state.currentWeekId = snap.exists ? (snap.data().weekId||null) : null;
+    state.loaded.current = true;
+    render();
+  }, ()=>{ state.loaded.current = true; render(); }));
+
+  unsubscribers.push(db.collection('weeks').onSnapshot(qs => {
+    const m = {}; qs.docs.forEach(d => m[d.id]=d.data());
+    state.weeks = m; state.loaded.weeks = true; render();
+  }, ()=>{ state.loaded.weeks = true; render(); }));
+
+  unsubscribers.push(db.collection('games').onSnapshot(qs => {
+    const m = {}; qs.docs.forEach(d => m[d.id]=d.data());
+    state.games = m; state.loaded.games = true; render();
+  }, ()=>{ state.loaded.games = true; render(); }));
+
+  unsubscribers.push(db.collection('picks').onSnapshot(qs => {
+    const m = {}; qs.docs.forEach(d => m[d.id]=d.data());
+    state.picks = m; state.loaded.picks = true; render();
+  }, ()=>{ state.loaded.picks = true; render(); }));
+
+  render();
+  renderIntervalId = setInterval(render, 30000);
+
+  const switchLink = document.createElement('div');
+  switchLink.style.cssText='text-align:center;margin-top:6px;';
+  switchLink.innerHTML = `<a href="#" id="switchPlayer" style="font-size:12px;color:var(--muted);text-decoration:underline;">Signed in as ${esc(myName)} · Sign out</a>`;
+  document.querySelector('footer').after(switchLink);
+  switchLink.querySelector('#switchPlayer').onclick = async (e) => {
+    e.preventDefault();
+    stopApp();
+    switchLink.remove();
+    await firebase.auth().signOut();
+  };
+}
+
+// ---------- boot ----------
+async function boot(){
+  if(!FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey==='YOUR_API_KEY'){
+    $('#content').innerHTML = `<div class="banner">This page needs a Firebase project connected before it'll work — paste your config into the FIREBASE_CONFIG block near the top of this file.</div>`;
+    return;
+  }
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.firestore();
+  const auth = firebase.auth();
+
+  // Finish an email-link sign-in if this load is that link being opened.
+  if(auth.isSignInWithEmailLink(window.location.href)){
+    let email = localStorage.getItem('spread_pending_email');
+    if(!email){ email = window.prompt('Confirm the email you signed in with:'); }
+    if(email){
+      try{
+        await auth.signInWithEmailLink(email, window.location.href);
+        localStorage.removeItem('spread_pending_email');
+      } catch(e){
+        alert('That sign-in link didn\'t work: ' + e.message);
+      }
+    }
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
+  // Surface any error from a Google redirect that just completed.
+  try{ await auth.getRedirectResult(); } catch(e){ console.error(e); }
+
+  auth.onAuthStateChanged(async (user) => {
+    if(!user){
+      stopApp();
+      renderSignInScreen();
+      return;
+    }
+    uid = user.uid;
+    canEdit = localStorage.getItem('spread_is_admin')==='yes';
+
+    if(user.displayName){
+      const snap = await db.collection('profiles').doc(uid).get();
+      if(snap.exists && snap.data().name){
+        myName = snap.data().name;
+      } else {
+        myName = user.displayName;
+        await db.collection('profiles').doc(uid).set({ name: myName });
+      }
+    } else {
+      await ensureName();
+    }
+
+    startApp();
+  });
+}
+document.getElementById('rulesLink').addEventListener('click', (e) => { e.preventDefault(); showRulesModal(); });
+boot();
+</script>
+</body>
+</html>

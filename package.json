@@ -1,0 +1,11 @@
+{
+  "name": "the-spread-sync",
+  "private": true,
+  "description": "Weekly NFL schedule + spread sync for The Spread pick'em site",
+  "scripts": {
+    "sync": "node scripts/sync-nfl.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}
