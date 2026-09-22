@@ -813,12 +813,9 @@ function renderSignInScreen(errorMsg){
     try{
       await firebase.auth().signInWithPopup(provider);
     } catch(e){
-      if(e.code==='auth/popup-closed-by-user' || e.code==='auth/cancelled-popup-request'){
-        return; // they backed out themselves, nothing to report
-      }
       if(e.code==='auth/popup-blocked' || e.code==='auth/operation-not-supported-in-this-environment'){
         try{ await firebase.auth().signInWithRedirect(provider); }
-        catch(e2){ alert('Could not start Google sign-in: ' + e2.message); }
+        catch(e2){ alert('Could not start Google sign-in: ' + e2.message + ' (' + e2.code + ')'); }
         return;
       }
       alert('Could not sign in with Google: ' + e.message + (e.code ? ' ('+e.code+')' : ''));
