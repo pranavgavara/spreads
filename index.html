@@ -792,12 +792,13 @@ function wireAdmin(){
 }
 
 // ---------- sign-in screen ----------
-function renderSignInScreen(){
+function renderSignInScreen(errorMsg){
   $('#content').innerHTML = `
     <div class="panel">
       <div style="padding:28px 20px; text-align:center;">
         <h2 style="font-size:26px; margin:0 0 8px;">Sign in to play</h2>
         <div class="muted" style="font-size:13px; margin-bottom:20px;">One sign-in works on every device — phone, laptop, whatever.</div>
+        ${errorMsg ? `<div class="banner urgent" style="text-align:left; margin-bottom:16px;"><strong>Sign-in failed:</strong> ${esc(errorMsg)}</div>` : ''}
         <button class="primary" id="googleSignIn" style="width:100%; max-width:280px; margin-bottom:14px;">Continue with Google</button>
         <div class="muted" style="font-size:12px; margin-bottom:10px;">— or —</div>
         <div style="max-width:280px; margin:0 auto;">
@@ -908,12 +909,14 @@ async function boot(){
   }
 
   // Surface any error from a Google redirect that just completed.
-  try{ await auth.getRedirectResult(); } catch(e){ console.error(e); }
+  let redirectError = null;
+  try{ await auth.getRedirectResult(); } catch(e){ redirectError = e.message; console.error(e); }
 
   auth.onAuthStateChanged(async (user) => {
     if(!user){
       stopApp();
-      renderSignInScreen();
+      renderSignInScreen(redirectError);
+      redirectError = null; // only show it once
       return;
     }
     uid = user.uid;
