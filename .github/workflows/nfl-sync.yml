@@ -2,9 +2,10 @@ name: NFL weekly sync
 
 on:
   schedule:
-    # Every Tuesday at 13:00 UTC (~9am ET / 6am PT) — after Monday Night
-    # Football wraps and sportsbooks have posted the new week's lines.
-    - cron: '0 13 * * 2'
+    # Every Wednesday at 13:00 UTC (~9am ET / 6am PT). ESPN's own
+    # "current week" pointer doesn't roll over until Wednesday, so running
+    # on Tuesday just re-confirmed the week that had already finished.
+    - cron: '0 13 * * 3'
   workflow_dispatch: {}   # lets you trigger it manually from the Actions tab
 
 jobs:
